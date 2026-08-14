@@ -8,37 +8,11 @@ import {
   isJavaObject,
 } from "@/lib/java/deserialize";
 
-import type { Band, Channel, Group, SplData, ImpulseData, Measurement, ParsedTune } from "@/lib/types";
+import type { SplData, ImpulseData, Measurement, ParsedTune } from "@/lib/types";
 export type { Band, Channel, Group, SplData, ImpulseData, Measurement, ParsedTune } from "@/lib/types";
 
 import { compareMeasurement } from "@/lib/style";
-
-function classify(name: string): { band: Band; channel: Channel; group: Group } {
-  const n = name.toLowerCase();
-  let band: Band = "Other";
-  if (/\bsub\b|sub/.test(n)) band = "Sub";
-  else if (/high/.test(n)) band = "High";
-  else if (/mid/.test(n)) band = "Mid";
-  else if (/low/.test(n)) band = "Low";
-
-  let channel: Channel = "Other";
-  if (/\bfl\b|front left|left|\bl\b/.test(n)) channel = "L";
-  if (/\bfr\b|front right|right|\br\b/.test(n)) channel = "R";
-  if (/pair/.test(n)) channel = "Pair";
-  if (/full system|full sys/.test(n)) channel = "Full";
-  // "Left - All" / "Right - All"
-  if (/^left\b/.test(n)) channel = "L";
-  if (/^right\b/.test(n)) channel = "R";
-
-  let group: Group = "OTHER";
-  if (/final/.test(n)) group = "FINAL";
-  else if (/\bxo\b|xover|cross/.test(n)) group = "XO";
-  else if (/\beq\b|equal/.test(n)) group = "EQ";
-  else if (/full/.test(n)) group = "FULL";
-  else if (/pair/.test(n)) group = "PAIR";
-
-  return { band, channel, group };
-}
+import { classify } from "@/lib/classify";
 
 // 1/6-octave smoothing evaluated on a 1/12-octave log output grid. Works for
 // both log- and linearly-spaced source data by mapping a ±1/12-octave frequency

@@ -13,6 +13,7 @@ import {
   compareMeasurement,
   compareSpeaker,
 } from "@/lib/style";
+import { classify } from "@/lib/classify";
 import UPlotChart from "@/components/UPlotChart";
 
 type Tab = "spl" | "impulse";
@@ -41,6 +42,16 @@ export default function TuneViewer({
   const [tab, setTab] = useState<Tab>("spl");
   const [impMode, setImpMode] = useState<ImpMode>("dbfs");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<Group>>(new Set());
+
+  function toggleCollapse(g: Group) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -51,11 +62,18 @@ export default function TuneViewer({
       })
       .then((t: ParsedTune) => {
         if (cancelled) return;
-        setTune(t);
-        // default: the FINAL group (falls back to all)
-        const finals = t.measurements.filter((m) => m.group === "FINAL");
-        const init = (finals.length ? finals : t.measurements).map((m) => m.id);
-        setSelected(new Set(init));
+        // Re-apply classification from the name so grouping rules stay current
+        // for previously-processed tunes.
+        const reclassified: ParsedTune = {
+          measurements: t.measurements.map((m) => ({
+            ...m,
+            ...classify(m.name),
+          })),
+        };
+        setTune(reclassified);
+        // default: only the FINAL group is selected; everything else off.
+        const finals = reclassified.measurements.filter((m) => m.group === "FINAL");
+        setSelected(new Set(finals.map((m) => m.id)));
       })
       .catch((e) => !cancelled && setError((e as Error).message));
     return () => {
@@ -222,32 +240,55 @@ export default function TuneViewer({
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto pr-1">
-          {byGroup.map(({ group, items }) => (
-            <div key={group} className="mb-3">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {GROUP_LABEL[group] ?? group}
+          {byGroup.map(({ group, items }) => {
+            const isCollapsed = collapsed.has(group);
+            const selCount = items.filter((m) => selected.has(m.id)).length;
+            return (
+              <div key={group} className="mb-2">
+                <button
+                  onClick={() => toggleCollapse(group)}
+                  className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-200"
+                >
+                  <svg
+                    viewBox="0 0 12 12"
+                    className={`h-3 w-3 shrink-0 transition-transform ${
+                      isCollapsed ? "-rotate-90" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" />
+                  </svg>
+                  <span>{GROUP_LABEL[group] ?? group}</span>
+                  <span className="ml-auto font-normal normal-case tracking-normal text-slate-600">
+                    {selCount}/{items.length}
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <ul className="space-y-0.5 pl-1">
+                    {items.map((m) => (
+                      <li key={m.id}>
+                        <label className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-slate-800/60">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(m.id)}
+                            onChange={() => toggle(m.id)}
+                            className="accent-sky-500"
+                          />
+                          <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ background: traceColor(m) }}
+                          />
+                          <span className="truncate text-slate-200">{m.name}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <ul className="space-y-0.5">
-                {items.map((m) => (
-                  <li key={m.id}>
-                    <label className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-slate-800/60">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(m.id)}
-                        onChange={() => toggle(m.id)}
-                        className="accent-sky-500"
-                      />
-                      <span
-                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ background: traceColor(m) }}
-                      />
-                      <span className="truncate text-slate-200">{m.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </aside>
 

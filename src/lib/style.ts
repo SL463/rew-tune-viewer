@@ -99,5 +99,5 @@ export const GROUP_LABEL: Record<string, string> = {
   EQ: "EQ",
   FINAL: "Final",
   PAIR: "Pairs",
-  OTHER: "Other",
+  OTHER: "Combined",
 };
