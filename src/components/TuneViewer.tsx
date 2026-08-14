@@ -239,7 +239,7 @@ export default function TuneViewer({
           </div>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto pr-1">
+        <div className="pr-1">
           {byGroup.map(({ group, items }) => {
             const isCollapsed = collapsed.has(group);
             const selCount = items.filter((m) => selected.has(m.id)).length;
