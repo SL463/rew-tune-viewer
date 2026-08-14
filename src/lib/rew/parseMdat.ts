@@ -36,9 +36,37 @@ function smoothSpl(
     isLog ? Math.log(f / startFreq) / Math.log(logStep) : (f - startFreq) / freqStep;
 
   const fMax = freqAt(n - 1);
+  // Show the full measured range up to the top of the sweep (~20 kHz). REW's
+  // validEndFreq is often a bit below fMax; we intentionally don't clip to it
+  // so the curve extends to the actual measured extent.
   const lo = Math.max(validStart > 0 ? validStart : startFreq, startFreq, 2);
-  const hi = Math.min(validEnd > 0 ? validEnd : fMax, fMax);
+  const hi = fMax;
+  void validEnd;
   if (!(hi > lo)) return { freqs: [], mags: [] };
+
+  // 1/6-octave smoothed magnitude at a center frequency (null if no samples).
+  const sampleAt = (fc: number): number | null => {
+    const fLow = fc * Math.pow(2, -HALF_OCT);
+    const fHigh = fc * Math.pow(2, HALF_OCT);
+    let a = Math.max(0, Math.ceil(indexAt(fLow)));
+    let b = Math.min(n - 1, Math.floor(indexAt(fHigh)));
+    let sum = 0;
+    let count = 0;
+    if (b < a) {
+      const idx = Math.min(n - 1, Math.max(0, Math.round(indexAt(fc))));
+      const v = spl[idx];
+      if (Number.isFinite(v)) return v;
+      return null;
+    }
+    for (let j = a; j <= b; j++) {
+      const v = spl[j];
+      if (Number.isFinite(v)) {
+        sum += v;
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : null;
+  };
 
   const nOut = Math.max(1, Math.round(Math.log2(hi / lo) * OUT_PPO));
   const freqs: number[] = [];
@@ -46,34 +74,19 @@ function smoothSpl(
   for (let k = 0; k <= nOut; k++) {
     const fc = lo * Math.pow(2, k / OUT_PPO);
     if (fc > hi) break;
-    const fLow = fc * Math.pow(2, -HALF_OCT);
-    const fHigh = fc * Math.pow(2, HALF_OCT);
-    let a = Math.ceil(indexAt(fLow));
-    let b = Math.floor(indexAt(fHigh));
-    a = Math.max(0, a);
-    b = Math.min(n - 1, b);
-    let sum = 0;
-    let count = 0;
-    if (b < a) {
-      // window narrower than sample spacing: take nearest sample
-      const idx = Math.min(n - 1, Math.max(0, Math.round(indexAt(fc))));
-      const v = spl[idx];
-      if (Number.isFinite(v)) {
-        sum = v;
-        count = 1;
-      }
-    } else {
-      for (let j = a; j <= b; j++) {
-        const v = spl[j];
-        if (Number.isFinite(v)) {
-          sum += v;
-          count++;
-        }
-      }
-    }
-    if (count > 0) {
+    const v = sampleAt(fc);
+    if (v !== null) {
       freqs.push(fc);
-      mags.push(sum / count);
+      mags.push(v);
+    }
+  }
+  // Ensure the curve reaches the true measured top (grid may stop ~1 step short).
+  const lastF = freqs[freqs.length - 1];
+  if (lastF !== undefined && hi > lastF * 1.001) {
+    const v = sampleAt(hi);
+    if (v !== null) {
+      freqs.push(hi);
+      mags.push(v);
     }
   }
   return { freqs, mags };
