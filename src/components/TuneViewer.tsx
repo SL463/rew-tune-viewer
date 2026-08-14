@@ -40,7 +40,7 @@ export default function TuneViewer({
   const [tune, setTune] = useState<ParsedTune | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("spl");
-  const [impMode, setImpMode] = useState<ImpMode>("dbfs");
+  const [impMode, setImpMode] = useState<ImpMode>("pct");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<Group>>(new Set());
 
