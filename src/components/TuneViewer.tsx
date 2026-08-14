@@ -4,7 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import type uPlot from "uplot";
 import type { ParsedTune, Measurement, Group } from "@/lib/types";
 import { buildSplData, buildImpulseData } from "@/lib/chartData";
-import { traceColor, traceDash, traceWidth, GROUP_LABEL } from "@/lib/style";
+import {
+  traceColor,
+  traceDash,
+  traceWidth,
+  GROUP_LABEL,
+  MEASURE_GROUP_ORDER,
+  compareMeasurement,
+  compareSpeaker,
+} from "@/lib/style";
 import UPlotChart from "@/components/UPlotChart";
 
 type Tab = "spl" | "impulse";
@@ -55,7 +63,11 @@ export default function TuneViewer({
     };
   }, [dataUrl]);
 
-  const measurements = tune?.measurements ?? [];
+  // Ordered by measurement-type group, then speaker (band/channel) within group.
+  const measurements = useMemo(
+    () => [...(tune?.measurements ?? [])].sort(compareMeasurement),
+    [tune]
+  );
   const selectedMeas = useMemo(
     () => measurements.filter((m) => selected.has(m.id)),
     [measurements, selected]
@@ -64,8 +76,7 @@ export default function TuneViewer({
   const groups = useMemo(() => {
     const set = new Set<Group>();
     measurements.forEach((m) => set.add(m.group));
-    const order: Group[] = ["FINAL", "XO", "FULL", "PAIR", "OTHER"];
-    return order.filter((g) => set.has(g));
+    return MEASURE_GROUP_ORDER.filter((g) => set.has(g));
   }, [measurements]);
 
   function selectGroup(g: Group) {
@@ -107,7 +118,10 @@ export default function TuneViewer({
         },
       ],
       series: [
-        { label: "Hz", value: (_u, v) => (v == null ? "" : `${fmtHz(v)} Hz`) },
+        {
+          label: "Hz",
+          value: (_u, v) => (v == null ? "" : `${Math.round(v)} Hz`),
+        },
         ...selectedMeas.map((m) => ({
           label: m.name,
           stroke: traceColor(m),
@@ -171,7 +185,7 @@ export default function TuneViewer({
     return <div className="rounded-lg bg-red-950/40 p-4 text-red-300">{error}</div>;
   if (!tune) return <div className="p-8 text-slate-400">Loading measurements…</div>;
 
-  const byBand = groupByBand(measurements);
+  const byGroup = groupByMeasureType(measurements);
   const impCount = selectedMeas.filter((m) => m.impulse).length;
 
   return (
@@ -208,10 +222,10 @@ export default function TuneViewer({
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto pr-1">
-          {byBand.map(({ band, items }) => (
-            <div key={band} className="mb-3">
+          {byGroup.map(({ group, items }) => (
+            <div key={group} className="mb-3">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {band}
+                {GROUP_LABEL[group] ?? group}
               </div>
               <ul className="space-y-0.5">
                 {items.map((m) => (
@@ -306,14 +320,16 @@ function TabBtn({
   );
 }
 
-function groupByBand(measurements: Measurement[]) {
-  const order = ["High", "Mid", "Low", "Sub", "Other"];
-  const map = new Map<string, Measurement[]>();
+// Group by measurement type (Full, XO, EQ, Final, Pairs, Other); items within
+// each group are sorted by speaker type/location (High/Mid/Low/Sub, then L/R).
+function groupByMeasureType(measurements: Measurement[]) {
+  const map = new Map<Group, Measurement[]>();
   for (const m of measurements) {
-    if (!map.has(m.band)) map.set(m.band, []);
-    map.get(m.band)!.push(m);
+    if (!map.has(m.group)) map.set(m.group, []);
+    map.get(m.group)!.push(m);
   }
-  return order
-    .filter((b) => map.has(b))
-    .map((band) => ({ band, items: map.get(band)! }));
+  return MEASURE_GROUP_ORDER.filter((g) => map.has(g)).map((group) => ({
+    group,
+    items: map.get(group)!.slice().sort(compareSpeaker),
+  }));
 }

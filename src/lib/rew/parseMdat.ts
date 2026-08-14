@@ -11,8 +11,7 @@ import {
 import type { Band, Channel, Group, SplData, ImpulseData, Measurement, ParsedTune } from "@/lib/types";
 export type { Band, Channel, Group, SplData, ImpulseData, Measurement, ParsedTune } from "@/lib/types";
 
-const BAND_ORDER: Record<Band, number> = { High: 0, Mid: 1, Low: 2, Sub: 3, Other: 4 };
-const CHANNEL_ORDER: Record<Channel, number> = { L: 0, R: 1, Pair: 2, Full: 3, Other: 4 };
+import { compareMeasurement } from "@/lib/style";
 
 function classify(name: string): { band: Band; channel: Channel; group: Group } {
   const n = name.toLowerCase();
@@ -34,6 +33,7 @@ function classify(name: string): { band: Band; channel: Channel; group: Group } 
   let group: Group = "OTHER";
   if (/final/.test(n)) group = "FINAL";
   else if (/\bxo\b|xover|cross/.test(n)) group = "XO";
+  else if (/\beq\b|equal/.test(n)) group = "EQ";
   else if (/full/.test(n)) group = "FULL";
   else if (/pair/.test(n)) group = "PAIR";
 
@@ -200,13 +200,7 @@ export function parseMdat(buf: Buffer): ParsedTune {
     });
   });
 
-  measurements.sort((a, b) => {
-    if (BAND_ORDER[a.band] !== BAND_ORDER[b.band])
-      return BAND_ORDER[a.band] - BAND_ORDER[b.band];
-    if (CHANNEL_ORDER[a.channel] !== CHANNEL_ORDER[b.channel])
-      return CHANNEL_ORDER[a.channel] - CHANNEL_ORDER[b.channel];
-    return a.name.localeCompare(b.name);
-  });
+  measurements.sort(compareMeasurement);
   measurements.forEach((m, i) => (m.sortIndex = i));
 
   return { measurements };

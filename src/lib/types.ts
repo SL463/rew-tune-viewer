@@ -2,7 +2,7 @@
 
 export type Band = "High" | "Mid" | "Low" | "Sub" | "Other";
 export type Channel = "L" | "R" | "Pair" | "Full" | "Other";
-export type Group = "FINAL" | "XO" | "FULL" | "PAIR" | "OTHER";
+export type Group = "FULL" | "XO" | "EQ" | "FINAL" | "PAIR" | "OTHER";
 
 export interface SplData {
   freqs: number[];
